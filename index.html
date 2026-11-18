@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>27th Birthday Quest 3D</title>
+    <!-- Tailwind CSS for UI Layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D Graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for Camera Interaction -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Outfit', sans-serif;
+            background-color: #0d0714;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        .font-fun {
+            font-family: 'Fredoka', cursive;
+        }
+        /* Custom Glassmorphism UI */
+        .glass-card {
+            background: rgba(22, 13, 38, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .btn-action {
+            transition: all 0.15s ease-in-out;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+        .btn-action:active {
+            transform: scale(0.92);
+        }
+        /* Glowing neon animations */
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 10px rgba(236, 72, 153, 0.8)); }
+            50% { filter: drop-shadow(0 0 25px rgba(236, 72, 153, 1)); }
+        }
+        .neon-text {
+            animation: pulse-glow 2s infinite;
+        }
+        /* Floating Damage/Stat Popups */
+        .stat-pop {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUpFade 1.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) FORWARD;
+            font-weight: 900;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            z-index: 50;
+        }
+        @keyframes floatUpFade {
+            0% { opacity: 0; transform: translateY(10px) scale(0.6); }
+            20% { opacity: 1; transform: translateY(-10px) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-70px) scale(1); }
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+    <!-- UI Overlay Engine -->
+    <div class="relative z-10 flex flex-col justify-between h-screen p-4 md:p-6 pointer-events-none">
+        
+        <!-- HEADER HUD: Social Counter & Progress to 1 TRILLION -->
+        <header class="w-full max-w-4xl mx-auto flex flex-col items-center pointer-events-auto">
+            <div class="glass-card w-full rounded-2xl p-4 flex flex-col items-center gap-3 border-t-2 border-pink-500/50">
+                <div class="flex justify-between items-center w-full px-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">🎉</span>
+                        <h1 class="text-xl md:text-2xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-300 to-yellow-400 font-fun">
+                            27TH BIRTHDAY QUEST
+                        </h1>
+                    </div>
+                    <div class="flex items-center gap-2 bg-purple-900/60 px-3 py-1 rounded-full border border-purple-500/40">
+                        <i class="fa-solid font-bold text-yellow-400 fa-trophy"></i>
+                        <span class="text-xs md:text-sm font-semibold tracking-wider text-yellow-200">TARGET: 1 TRILLION</span>
+                    </div>
+                </div>
+
+                <!-- Combined Total Trillion Counter Bar -->
+                <div class="w-full bg-slate-900/80 rounded-xl p-3 border border-purple-500/30 flex flex-col items-center">
+                    <span class="text-xs font-bold text-purple-300 uppercase tracking-widest mb-1">Total Viral Reach</span>
+                    <div id="total-viral-counter" class="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-cyan-300 neon-text">
+                        0
+                    </div>
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-gray-800 h-3 rounded-full mt-2 overflow-hidden relative border border-white/10">
+                        <div id="progress-bar" class="h-full bg-gradient-to-r from-pink-500 via-purple-500 to-yellow-400 w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+
+                <!-- Individual Social Stats Grid -->
+                <div class="grid grid-cols-5 gap-1.5 md:gap-3 w-full text-center">
+                    <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-1.5 flex flex-col items-center">
+                        <i class="fa-solid fa-eye text-red-400 text-xs md:text-sm"></i>
+                        <span class="text-[10px] md:text-xs text-gray-400">Views</span>
+                        <span id="stat-views" class="text-xs md:text-sm font-bold text-red-200">0</span>
+                    </div>
+                    <div class="bg-pink-500/10 border border-pink-500/30 rounded-lg p-1.5 flex flex-col items-center">
+                        <i class="fa-solid fa-heart text-pink-400 text-xs md:text-sm"></i>
+                        <span class="text-[10px] md:text-xs text-gray-400">Likes</span>
+                        <span id="stat-likes" class="text-xs md:text-sm font-bold text-pink-200">0</span>
+                    </div>
+                    <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-1.5 flex flex-col items-center">
+                        <i class="fa-solid fa-share text-blue-400 text-xs md:text-sm"></i>
+                        <span class="text-[10px] md:text-xs text-gray-400">Shares</span>
+                        <span id="stat-shares" class="text-xs md:text-sm font-bold text-blue-200">0</span>
+                    </div>
+                    <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-1.5 flex flex-col items-center">
+                        <i class="fa-solid fa-comment text-green-400 text-xs md:text-sm"></i>
+                        <span class="text-[10px] md:text-xs text-gray-400">Comments</span>
+                        <span id="stat-comments" class="text-xs md:text-sm font-bold text-green-200">0</span>
+                    </div>
+                    <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-1.5 flex flex-col items-center">
+                        <i class="fa-solid fa-bell text-yellow-400 text-xs md:text-sm"></i>
+                        <span class="text-[10px] md:text-xs text-gray-400">Subs</span>
+                        <span id="stat-subs" class="text-xs md:text-sm font-bold text-yellow-200">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- CENTER HINT INSTRUCTION -->
+        <div class="text-center my-auto pointer-events-none opacity-80 transition-opacity duration-500" id="hint-box">
+            <span class="bg-black/60 px-4 py-2 rounded-full border border-white/20 text-xs md:text-sm tracking-wide text-purple-200">
+                <i class="fa-solid fa-hand-pointer mr-1 animate-bounce"></i> Click & Drag to Orbit Camera | Tap 3D Doll or Cake!
+            </span>
+        </div>
+
+        <!-- FOOTER CONTROLS & QUEST BUTTONS -->
+        <footer class="w-full max-w-4xl mx-auto pointer-events-auto">
+            <div class="glass-card rounded-2xl p-3 md:p-4 grid grid-cols-2 md:grid-cols-4 gap-2.5 border-b-2 border-yellow-500/50">
+                <!-- Action 1: Slap Voodoo Doll -->
+                <button id="btn-slap-doll" class="btn-action bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 p-3 rounded-xl flex flex-col items-center justify-center border border-purple-400/40">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xl">🪆</span>
+                        <span class="font-bold text-xs md:text-sm">SLAP VOODOO DOLL</span>
+                    </div>
+                    <span class="text-[10px] text-purple-200 bg-black/30 px-2 py-0.5 rounded-full">+10B Likes/Shares</span>
+                </button>
+
+                <!-- Action 2: Blow Candles -->
+                <button id="btn-blow-candles" class="btn-action bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 p-3 rounded-xl flex flex-col items-center justify-center border border-pink-400/40">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xl">🎂</span>
+                        <span class="font-bold text-xs md:text-sm">BLOW 27 CANDLES</span>
+                    </div>
+                    <span class="text-[10px] text-pink-200 bg-black/30 px-2 py-0.5 rounded-full">+50B Views + Fireworks</span>
+                </button>
+
+                <!-- Action 3: Slice Chiffon Cake -->
+                <button id="btn-slice-cake" class="btn-action bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 p-3 rounded-xl flex flex-col items-center justify-center border border-yellow-400/40">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xl">🍰</span>
+                        <span class="font-bold text-xs md:text-sm">SLICE CHIFFON CAKE</span>
+                    </div>
+                    <span class="text-[10px] text-yellow-200 bg-black/30 px-2 py-0.5 rounded-full">+100B Subs + Confetti</span>
+                </button>
+
+                <!-- Action 4: Auto Booster -->
+                <button id="btn-viral-boost" class="btn-action bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 p-3 rounded-xl flex flex-col items-center justify-center border border-cyan-400/40 relative overflow-hidden col-span-2 md:col-span-1">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xl">🚀</span>
+                        <span class="font-bold text-xs md:text-sm">MEGA VIRAL BOOST</span>
+                    </div>
+                    <span id="boost-status" class="text-[10px] text-cyan-200 bg-black/30 px-2 py-0.5 rounded-full">AUTO VIRAL (+5B/sec)</span>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- TRILLION VICTORY MODAL -->
+    <div id="victory-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md hidden transition-opacity duration-500 opacity-0 pointer-events-none">
+        <div class="glass-card max-w-lg w-full rounded-3xl p-6 md:p-8 text-center flex flex-col items-center border-2 border-yellow-400/80 shadow-[0_0_50px_rgba(250,204,21,0.5)]">
+            <div class="text-6xl mb-2 animate-bounce">👑👑👑</div>
+            <h2 class="text-3xl md:text-4xl font-black font-fun text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-cyan-300 mb-2">
+                1 TRILLION ACHIEVED!
+            </h2>
+            <p class="text-purple-200 text-sm md:text-base mb-6">
+                Congratulations on completing the <strong class="text-yellow-300">27th Birthday Quest</strong>! You are officially the supreme viral legend of the internet!
+            </p>
+            <div class="grid grid-cols-2 gap-3 w-full mb-6 text-left bg-purple-950/60 p-4 rounded-xl border border-purple-500/30 text-xs md:text-sm">
+                <div>💥 Total Views: <span id="final-views" class="font-bold text-red-400">0</span></div>
+                <div>❤️ Total Likes: <span id="final-likes" class="font-bold text-pink-400">0</span></div>
+                <div>🔄 Total Shares: <span id="final-shares" class="font-bold text-blue-400">0</span></div>
+                <div>💬 Comments: <span id="final-comments" class="font-bold text-green-400">0</span></div>
+                <div class="col-span-2">🔔 Subscribers: <span id="final-subs" class="font-bold text-yellow-400">0</span></div>
+            </div>
+            <button id="btn-restart" class="btn-action w-full py-3 bg-gradient-to-r from-pink-500 via-purple-600 to-yellow-500 rounded-xl font-black text-lg text-white shadow-lg border border-white/30">
+                PLAY AGAIN & RE-LIVE THE MAGIC 🎉
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        // --- WEBAUDIO SYNTHESIZER FOR SFX ---
+        const AudioSys = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playPop(freq = 400, type = 'sine') {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(freq * 0.3, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            },
+            playBoom() {
+                this.init();
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.5);
+            },
+            playFanfare() {
+                this.init();
+                if (!this.ctx) return;
+                const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
+                notes.forEach((freq, index) => {
+                    setTimeout(() => {
+                        this.playPop(freq, 'triangle');
+                    }, index * 100);
+                });
+            }
+        };
+
+        // --- GAME STATE ENGINE ---
+        const TARGET_TRILLION = 1000000000000; // 1 Trillion (1,000,000,000,000)
+        let gameState = {
+            views: 0,
+            likes: 0,
+            shares: 0,
+            comments: 0,
+            subs: 0,
+            total: 0,
+            autoBoostActive: false,
+            autoBoostInterval: null,
+            hasWon: false
+        };
+
+        // Format Big Numbers cleanly (e.g. 1.25B, 450M, 1.00T)
+        function formatNum(num) {
+            if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+            return num.toLocaleString();
+        }
+
+        function updateUI() {
+            gameState.total = gameState.views + gameState.likes + gameState.shares + gameState.comments + gameState.subs;
+            
+            document.getElementById('stat-views').innerText = formatNum(gameState.views);
+            document.getElementById('stat-likes').innerText = formatNum(gameState.likes);
+            document.getElementById('stat-shares').innerText = formatNum(gameState.shares);
+            document.getElementById('stat-comments').innerText = formatNum(gameState.comments);
+            document.getElementById('stat-subs').innerText = formatNum(gameState.subs);
+            
+            document.getElementById('total-viral-counter').innerText = formatNum(gameState.total);
+
+            // Progress bar ratio
+            const progress = Math.min(100, (gameState.total / TARGET_TRILLION) * 100);
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+
+            // Victory Check
+            if (gameState.total >= TARGET_TRILLION && !gameState.hasWon) {
+                triggerVictory();
+            }
+        }
+
+        function spawnStatPop(text, colorClass = 'text-yellow-300', x = null, y = null) {
+            const pop = document.createElement('div');
+            pop.className = `stat-pop ${colorClass} text-base md:text-xl font-fun`;
+            pop.innerText = text;
+
+            const posX = x !== null ? x : (window.innerWidth / 2) + (Math.random() * 120 - 60);
+            const posY = y !== null ? y : (window.innerHeight / 2) + (Math.random() * 60 - 30);
+
+            pop.style.left = `${posX}px`;
+            pop.style.top = `${posY}px`;
+
+            document.body.appendChild(pop);
+            setTimeout(() => pop.remove(), 1200);
+        }
+
+        function triggerVictory() {
+            gameState.hasWon = true;
+            AudioSys.playFanfare();
+            createFireworksBurst(15);
+
+            document.getElementById('final-views').innerText = formatNum(gameState.views);
+            document.getElementById('final-likes').innerText = formatNum(gameState.likes);
+            document.getElementById('final-shares').innerText = formatNum(gameState.shares);
+            document.getElementById('final-comments').innerText = formatNum(gameState.comments);
+            document.getElementById('final-subs').innerText = formatNum(gameState.subs);
+
+            const modal = document.getElementById('victory-modal');
+            modal.classList.remove('hidden', 'pointer-events-none');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        // --- THREE.JS 3D SCENE SETUP ---
+        let scene, camera, renderer, controls;
+        let voodooDollGroup, chiffonCakeGroup;
+        let confettiParticles, fireworksArray = [];
+        let candleFlames = [];
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0d0714, 0.035);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 4, 11);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            container.appendChild(renderer.domElement);
+
+            // Orbit Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 + 0.05; // Don't go below ground
+            controls.minDistance = 5;
+            controls.maxDistance = 20;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffe6b3, 1.2);
+            dirLight.position.set(5, 12, 8);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            // Colorful Party Point Lights
+            const pinkLight = new THREE.PointLight(0xec4899, 2, 15);
+            pinkLight.position.set(-4, 3, -2);
+            scene.add(pinkLight);
+
+            const cyanLight = new THREE.PointLight(0x06b6d4, 2, 15);
+            cyanLight.position.set(4, 3, -2);
+            scene.add(cyanLight);
+
+            // Build Scene Objects
+            createStageFloor();
+            voodooDollGroup = createVoodooDoll();
+            voodooDollGroup.position.set(-2.2, 0, 0.5);
+            scene.add(voodooDollGroup);
+
+            chiffonCakeGroup = createChiffonCake();
+            chiffonCakeGroup.position.set(2.0, 0, -0.5);
+            scene.add(chiffonCakeGroup);
+
+            createConfettiSystem();
+
+            // Window Resize handling
+            window.addEventListener('resize', onWindowResize);
+
+            // Raycasting for Direct 3D object clicks
+            setupRaycaster();
+
+            // Start Animation Loop
+            animate();
+        }
+
+        // --- 3D MESH GENERATORS ---
+
+        // 1. Festive Stage Floor
+        function createStageFloor() {
+            const floorGeo = new THREE.CylinderGeometry(8, 8.5, 0.4, 64);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x1e1133,
+                roughness: 0.3,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.position.y = -0.2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            // Glowing Stage Ring
+            const ringGeo = new THREE.RingGeometry(7.8, 8.1, 64);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xec4899, side: THREE.DoubleSide });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.y = 0.01;
+            scene.add(ring);
+        }
+
+        // 2. Procedural Voodoo Doll (Bouncy & Detailed)
+        function createVoodooDoll() {
+            const doll = new THREE.Group();
+
+            const burlapMat = new THREE.MeshStandardMaterial({
+                color: 0x9e7b66,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            const buttonMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 });
+            const stitchMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const heartMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
+
+            // Head
+            const headGeo = new THREE.SphereGeometry(0.8, 32, 32);
+            headGeo.scale(1, 0.9, 0.95);
+            const head = new THREE.Mesh(headGeo, burlapMat);
+            head.position.y = 1.9;
+            head.castShadow = true;
+            doll.add(head);
+
+            // Button Eye (Right)
+            const eyeGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.05, 16);
+            const eyeRight = new THREE.Mesh(eyeGeo, buttonMat);
+            eyeRight.rotation.x = Math.PI / 2;
+            eyeRight.position.set(0.28, 2.0, 0.72);
+            doll.add(eyeRight);
+
+            // Cross Eye (Left - Felt Stitch X)
+            const crossGroup = new THREE.Group();
+            const crossMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+            const barGeo = new THREE.BoxGeometry(0.3, 0.06, 0.02);
+            const bar1 = new THREE.Mesh(barGeo, crossMat);
+            bar1.rotation.z = Math.PI / 4;
+            const bar2 = new THREE.Mesh(barGeo, crossMat);
+            bar2.rotation.z = -Math.PI / 4;
+            crossGroup.add(bar1, bar2);
+            crossGroup.position.set(-0.28, 2.0, 0.73);
+            doll.add(crossGroup);
+
+            // Stitched Mouth
+            const mouthLineGeo = new THREE.BoxGeometry(0.5, 0.03, 0.02);
+            const mouthLine = new THREE.Mesh(mouthLineGeo, stitchMat);
+            mouthLine.position.set(0, 1.65, 0.73);
+            doll.add(mouthLine);
+            for (let i = -0.2; i <= 0.2; i += 0.1) {
+                const stitch = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.03), stitchMat);
+                stitch.position.set(i, 1.65, 0.74);
+                doll.add(stitch);
+            }
+
+            // Body
+            const bodyGeo = new THREE.CylinderGeometry(0.6, 0.75, 1.2, 32);
+            const body = new THREE.Mesh(bodyGeo, burlapMat);
+            body.position.y = 0.9;
+            body.castShadow = true;
+            doll.add(body);
+
+            // Felt Heart patch
+            const heartGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            heartGeo.scale(1, 1.2, 0.4);
+            const heart = new THREE.Mesh(heartGeo, heartMat);
+            heart.position.set(-0.25, 1.1, 0.62);
+            doll.add(heart);
+
+            // Arms & Legs
+            const limbGeo = new THREE.CylinderGeometry(0.2, 0.18, 0.8, 16);
+            
+            // Left Arm
+            const armL = new THREE.Mesh(limbGeo, burlapMat);
+            armL.position.set(-0.75, 1.0, 0);
+            armL.rotation.z = Math.PI / 3;
+            doll.add(armL);
+
+            // Right Arm
+            const armR = new THREE.Mesh(limbGeo, burlapMat);
+            armR.position.set(0.75, 1.0, 0);
+            armR.rotation.z = -Math.PI / 3;
+            doll.add(armR);
+
+            // Legs
+            const legL = new THREE.Mesh(limbGeo, burlapMat);
+            legL.position.set(-0.35, 0.3, 0);
+            doll.add(legL);
+
+            const legR = new THREE.Mesh(limbGeo, burlapMat);
+            legR.position.set(0.35, 0.3, 0);
+            doll.add(legR);
+
+            // Assign name tag for raycasting
+            doll.userData = { name: "VoodooDoll" };
+            doll.traverse(child => { if(child.isMesh) child.userData = { name: "VoodooDoll" }; });
+
+            return doll;
+        }
+
+        // 3. Multi-Tier Chiffon Cake with 27 Glowing Candles
+        function createChiffonCake() {
+            const cakeGroup = new THREE.Group();
+
+            // Materials
+            const cakeBaseMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.5 }); // Soft chiffon yellow
+            const frostingMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.2 }); // Pink frosting
+            const creamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+            const candleMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.3 });
+            const flameMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+
+            // Stand / Plate
+            const plateGeo = new THREE.CylinderGeometry(2.2, 1.8, 0.15, 32);
+            const plateMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8, roughness: 0.2 });
+            const plate = new THREE.Mesh(plateGeo, plateMat);
+            plate.position.y = 0.08;
+            plate.receiveShadow = true;
+            cakeGroup.add(plate);
+
+            // Bottom Tier Cake
+            const tier1Geo = new THREE.CylinderGeometry(1.8, 1.8, 0.7, 32);
+            const tier1 = new THREE.Mesh(tier1Geo, cakeBaseMat);
+            tier1.position.y = 0.5;
+            tier1.castShadow = true;
+            cakeGroup.add(tier1);
+
+            // Bottom Frosting Layer
+            const frost1Geo = new THREE.CylinderGeometry(1.85, 1.85, 0.2, 32);
+            const frost1 = new THREE.Mesh(frost1Geo, frostingMat);
+            frost1.position.y = 0.85;
+            cakeGroup.add(frost1);
+
+            // Top Tier Cake
+            const tier2Geo = new THREE.CylinderGeometry(1.2, 1.2, 0.6, 32);
+            const tier2 = new THREE.Mesh(tier2Geo, cakeBaseMat);
+            tier2.position.y = 1.25;
+            tier2.castShadow = true;
+            cakeGroup.add(tier2);
+
+            // Top Frosting Layer
+            const frost2Geo = new THREE.CylinderGeometry(1.25, 1.25, 0.15, 32);
+            const frost2 = new THREE.Mesh(frost2Geo, creamMat);
+            frost2.position.y = 1.55;
+            cakeGroup.add(frost2);
+
+            // Decorative Whipped Creams around top tier edge
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const dollop = new THREE.Mesh(new THREE.DodecahedronGeometry(0.08), creamMat);
+                dollop.position.set(Math.cos(angle) * 1.15, 1.62, Math.sin(angle) * 1.15);
+                cakeGroup.add(dollop);
+            }
+
+            // 27 Candles Placement!
+            candleFlames = [];
+            for (let i = 0; i < 27; i++) {
+                const candleContainer = new THREE.Group();
+
+                // Candle Body
+                const cGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.35, 12);
+                const cMesh = new THREE.Mesh(cGeo, candleMat);
+                cMesh.position.y = 0.175;
+                cMesh.castShadow = true;
+                candleContainer.add(cMesh);
+
+                // Flame
+                const fGeo = new THREE.ConeGeometry(0.035, 0.12, 12);
+                const fMesh = new THREE.Mesh(fGeo, flameMat);
+                fMesh.position.y = 0.41;
+                candleContainer.add(fMesh);
+
+                // Flame Point Light (For dynamic glow)
+                if (i % 4 === 0) {
+                    const cLight = new THREE.PointLight(0xf59e0b, 0.5, 1.5);
+                    cLight.position.y = 0.45;
+                    candleContainer.add(cLight);
+                }
+
+                // Distribute 27 candles in 2 concentric rings on top & bottom tier
+                let radius, height;
+                if (i < 18) {
+                    radius = 1.55; // Outer ring
+                    height = 0.95;
+                    const angle = (i / 18) * Math.PI * 2;
+                    candleContainer.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
+                } else {
+                    radius = 0.8; // Inner ring
+                    height = 1.62;
+                    const angle = ((i - 18) / 9) * Math.PI * 2;
+                    candleContainer.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
+                }
+
+                cakeGroup.add(candleContainer);
+                candleFlames.push(fMesh);
+            }
+
+            cakeGroup.userData = { name: "ChiffonCake" };
+            cakeGroup.traverse(child => { if(child.isMesh) child.userData = { name: "ChiffonCake" }; });
+
+            return cakeGroup;
+        }
+
+        // 4. Celebratory 3D Confetti Particle System
+        function createConfettiSystem() {
+            const count = 300;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const velocities = [];
+
+            const colorOptions = [
+                new THREE.Color(0xec4899), // Pink
+                new THREE.Color(0x38bdf8), // Cyan
+                new THREE.Color(0xfacc15), // Gold
+                new THREE.Color(0xa855f7), // Purple
+                new THREE.Color(0x22c55e)  // Green
+            ];
+
+            for (let i = 0; i < count; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 16;
+                positions[i * 3 + 1] = Math.random() * 12 + 2;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 16;
+
+                const col = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+                colors[i * 3] = col.r;
+                colors[i * 3 + 1] = col.g;
+                colors[i * 3 + 2] = col.b;
+
+                velocities.push({
+                    y: -Math.random() * 0.04 - 0.01,
+                    rotX: Math.random() * 0.05,
+                    rotY: Math.random() * 0.05
+                });
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.15,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.85
+            });
+
+            confettiParticles = new THREE.Points(geometry, material);
+            confettiParticles.userData = { velocities };
+            scene.add(confettiParticles);
+        }
+
+        // 5. 3D Fireworks Particle Burst Creator
+        function createFireworksBurst(count = 5) {
+            for (let f = 0; f < count; f++) {
+                setTimeout(() => {
+                    const burstGroup = new THREE.Group();
+                    const particleCount = 80;
+                    const geo = new THREE.BufferGeometry();
+                    const pos = new Float32Array(particleCount * 3);
+                    const vels = [];
+
+                    const colorHex = [0xfacc15, 0xec4899, 0x38bdf8, 0xa855f7, 0xef4444][Math.floor(Math.random() * 5)];
+                    const mat = new THREE.PointsMaterial({
+                        size: 0.2,
+                        color: colorHex,
+                        transparent: true,
+                        opacity: 1
+                    });
+
+                    const origin = new THREE.Vector3(
+                        (Math.random() - 0.5) * 10,
+                        Math.random() * 4 + 5,
+                        (Math.random() - 0.5) * 8
+                    );
+
+                    for (let i = 0; i < particleCount; i++) {
+                        pos[i * 3] = origin.x;
+                        pos[i * 3 + 1] = origin.y;
+                        pos[i * 3 + 2] = origin.z;
+
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.acos((Math.random() * 2) - 1);
+                        const speed = Math.random() * 0.15 + 0.05;
+
+                        vels.push(new THREE.Vector3(
+                            Math.sin(phi) * Math.cos(theta) * speed,
+                            Math.sin(phi) * Math.sin(theta) * speed,
+                            Math.cos(phi) * speed
+                        ));
+                    }
+
+                    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                    const pSystem = new THREE.Points(geo, mat);
+                    pSystem.userData = { vels, life: 1.0 };
+                    scene.add(pSystem);
+                    fireworksArray.push(pSystem);
+
+                    AudioSys.playBoom();
+                }, f * 180);
+            }
+        }
+
+        // --- RAYCASTING FOR DIRECT 3D CLICK INTERACTIONS ---
+        function setupRaycaster() {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            window.addEventListener('pointerdown', (e) => {
+                // Ignore if clicking on HTML UI buttons
+                if (e.target.closest('button') || e.target.closest('#victory-modal')) return;
+
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+
+                if (intersects.length > 0) {
+                    let obj = intersects[0].object;
+                    while (obj.parent && obj.parent !== scene && !obj.userData.name) {
+                        obj = obj.parent;
+                    }
+                    
+                    if (obj.userData.name === "VoodooDoll") {
+                        triggerDollSlap(e.clientX, e.clientY);
+                    } else if (obj.userData.name === "ChiffonCake") {
+                        triggerCakeSlice(e.clientX, e.clientY);
+                    }
+                }
+            });
+        }
+
+        // --- GAME ACTIONS & ANIMATION TRIGGER LOGIC ---
+
+        // Action 1: Slap Voodoo Doll (+10B Likes/Shares)
+        function triggerDollSlap(screenX = null, screenY = null) {
+            gameState.likes += 10000000000;
+            gameState.shares += 10000000000;
+            updateUI();
+            AudioSys.playPop(520, 'square');
+
+            spawnStatPop('+10B LIKES & SHARES! 🪆', 'text-purple-400', screenX, screenY);
+
+            // 3D Bounce Animation
+            let startTime = performance.now();
+            const animateSlap = () => {
+                const elapsed = (performance.now() - startTime) / 1000;
+                if (elapsed < 0.4) {
+                    voodooDollGroup.scale.set(1.3, 0.7, 1.3);
+                    voodooDollGroup.rotation.z = Math.sin(elapsed * 40) * 0.3;
+                    requestAnimationFrame(animateSlap);
+                } else {
+                    voodooDollGroup.scale.set(1, 1, 1);
+                    voodooDollGroup.rotation.z = 0;
+                }
+            };
+            animateSlap();
+        }
+
+        // Action 2: Blow Candles (+50B Views + Fireworks)
+        function triggerCandleBlow(screenX = null, screenY = null) {
+            gameState.views += 50000000000;
+            updateUI();
+            AudioSys.playPop(350, 'sine');
+            createFireworksBurst(4);
+
+            spawnStatPop('+50B VIEWS! 🎆', 'text-pink-400', screenX, screenY);
+
+            // Candle Flame flicker animation
+            candleFlames.forEach(flame => {
+                flame.scale.set(2, 2, 2);
+                setTimeout(() => flame.scale.set(1, 1, 1), 500);
+            });
+        }
+
+        // Action 3: Slice Chiffon Cake (+100B Subs + Confetti)
+        function triggerCakeSlice(screenX = null, screenY = null) {
+            gameState.subs += 100000000000;
+            gameState.comments += 25000000000;
+            updateUI();
+            AudioSys.playPop(700, 'triangle');
+
+            spawnStatPop('+100B SUBSCRIBERS! 🍰', 'text-yellow-300', screenX, screenY);
+
+            // 3D Cake Jump/Squish Animation
+            let startTime = performance.now();
+            const animateCake = () => {
+                const elapsed = (performance.now() - startTime) / 1000;
+                if (elapsed < 0.3) {
+                    chiffonCakeGroup.position.y = Math.sin(elapsed * Math.PI / 0.3) * 0.5;
+                    chiffonCakeGroup.rotation.y += 0.1;
+                    requestAnimationFrame(animateCake);
+                } else {
+                    chiffonCakeGroup.position.y = 0;
+                }
+            };
+            animateCake();
+        }
+
+        // Action 4: Toggle Mega Viral Boost (Autoclicker)
+        function toggleViralBoost() {
+            const btn = document.getElementById('btn-viral-boost');
+            const status = document.getElementById('boost-status');
+
+            if (!gameState.autoBoostActive) {
+                gameState.autoBoostActive = true;
+                btn.classList.add('ring-4', 'ring-cyan-300');
+                status.innerText = "BOOSTER ACTIVE 🔥";
+                AudioSys.playPop(880, 'sine');
+
+                gameState.autoBoostInterval = setInterval(() => {
+                    gameState.views += 2000000000;
+                    gameState.likes += 1000000000;
+                    gameState.shares += 1000000000;
+                    gameState.comments += 1000000000;
+                    updateUI();
+                    AudioSys.playPop(600 + Math.random() * 200, 'sine');
+                }, 400);
+            } else {
+                gameState.autoBoostActive = false;
+                btn.classList.remove('ring-4', 'ring-cyan-300');
+                status.innerText = "AUTO VIRAL (+5B/sec)";
+                clearInterval(gameState.autoBoostInterval);
+            }
+        }
+
+        // --- BUTTON EVENT LISTENERS ---
+        document.getElementById('btn-slap-doll').addEventListener('click', (e) => triggerDollSlap(e.clientX, e.clientY));
+        document.getElementById('btn-blow-candles').addEventListener('click', (e) => triggerCandleBlow(e.clientX, e.clientY));
+        document.getElementById('btn-slice-cake').addEventListener('click', (e) => triggerCakeSlice(e.clientX, e.clientY));
+        document.getElementById('btn-viral-boost').addEventListener('click', toggleViralBoost);
+        
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            gameState.views = 0;
+            gameState.likes = 0;
+            gameState.shares = 0;
+            gameState.comments = 0;
+            gameState.subs = 0;
+            gameState.hasWon = false;
+            updateUI();
+            
+            const modal = document.getElementById('victory-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 500);
+        });
+
+        // --- MAIN ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // OrbitControls update
+            controls.update();
+
+            const time = performance.now() * 0.001;
+
+            // Idle floating animation for Voodoo Doll & Cake
+            if (voodooDollGroup) {
+                voodooDollGroup.position.y = Math.sin(time * 2) * 0.08;
+                voodooDollGroup.rotation.y = Math.sin(time * 1) * 0.1;
+            }
+            if (chiffonCakeGroup) {
+                chiffonCakeGroup.rotation.y += 0.003;
+            }
+
+            // Animate Candle Flames Flicker
+            candleFlames.forEach((flame, idx) => {
+                flame.scale.x = 1 + Math.sin(time * 10 + idx) * 0.15;
+                flame.scale.y = 1 + Math.cos(time * 12 + idx) * 0.2;
+            });
+
+            // Animate Confetti Particles Falling
+            if (confettiParticles) {
+                const positions = confettiParticles.geometry.attributes.position.array;
+                const vels = confettiParticles.userData.velocities;
+
+                for (let i = 0; i < vels.length; i++) {
+                    positions[i * 3 + 1] += vels[i].y;
+                    positions[i * 3] += Math.sin(time + i) * 0.01;
+
+                    // Reset to top when falling past floor
+                    if (positions[i * 3 + 1] < 0) {
+                        positions[i * 3 + 1] = 12;
+                    }
+                }
+                confettiParticles.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // Animate Active Fireworks Bursts
+            for (let i = fireworksArray.length - 1; i >= 0; i--) {
+                const fw = fireworksArray[i];
+                const positions = fw.geometry.attributes.position.array;
+                const vels = fw.userData.vels;
+
+                fw.userData.life -= 0.015;
+                fw.material.opacity = fw.userData.life;
+
+                for (let j = 0; j < vels.length; j++) {
+                    positions[j * 3] += vels[j].x;
+                    positions[j * 3 + 1] += vels[j].y;
+                    positions[j * 3 + 2] += vels[j].z;
+
+                    // Add subtle gravity
+                    vels[j].y -= 0.002;
+                }
+                fw.geometry.attributes.position.needsUpdate = true;
+
+                if (fw.userData.life <= 0) {
+                    scene.remove(fw);
+                    fireworksArray.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- RESPONSIVE RESIZING ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Initialize game on window load
+        window.onload = () => {
+            init3D();
+            updateUI();
+        };
+    </script>
+</body>
+</html>
